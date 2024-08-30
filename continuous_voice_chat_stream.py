@@ -2,7 +2,6 @@ import os
 import asyncio
 import pyaudio
 import wave
-import pygame
 from dotenv import load_dotenv
 from groq import Groq
 from openai import OpenAI
@@ -29,7 +28,7 @@ CHANNELS = 1
 RATE = 44100
 CHUNK = 1024
 RECORD_SECONDS = 5
-WAVE_OUTPUT_FILENAME = "test.wav"
+WAVE_OUTPUT_FILENAME = "temp_audio.wav"
 
 
 # 录制音频函数
@@ -55,7 +54,7 @@ def record_audio():
     stream.close()
     audio.terminate()
 
-    # 保存录制的音频文件
+    # 保存录制的音频数据到文件
     with wave.open(WAVE_OUTPUT_FILENAME, "wb") as wf:
         wf.setnchannels(CHANNELS)
         wf.setsampwidth(audio.get_sample_size(FORMAT))
@@ -79,7 +78,7 @@ def transcribe_audio(filename):
 def stream_chat_completion(prompt):
     global conversation_history
     if not conversation_history:
-        conversation_history.append({"role": "system", "content": "你是一个语音助手，请用简体中文回答问题。请确保回答简洁、自然，并且只使用纯文本，不使用任何格式化符号或Markdown语法。回答内容应适合合成语音。"})
+        conversation_history.append({"role": "system", "content": "你是一个语音助手。"})
     conversation_history.append({"role": "user", "content": prompt})
 
     completion_text = ""
@@ -102,60 +101,50 @@ def stream_chat_completion(prompt):
     return completion_text
 
 
-# 使用 edge-tts 将文本转换为语音并保存为文件
-async def text_to_speech(text, output_file):
-    # 这里不再检查并删除文件，避免删除正在被使用的文件
+# 使用 edge-tts 直接播放生成的语音数据
+async def text_to_speech_and_play(text):
     communicate = edge_tts.Communicate(text, voice="zh-CN-XiaoxiaoNeural")
-    await communicate.save(output_file)
 
+    # 初始化 pyaudio
+    p = pyaudio.PyAudio()
+    stream = p.open(format=pyaudio.paInt16, channels=1, rate=24000, output=True)
 
-# 播放音频文件
-def play_audio(file_path):
-    pygame.mixer.init()  # 初始化pygame混音器
-    pygame.mixer.music.load(file_path)  # 加载音频文件
-    pygame.mixer.music.play()  # 播放音频文件
+    # 流式播放生成的语音
+    async for chunk in communicate.stream():
+        if "data" in chunk:
+            stream.write(chunk["data"])
 
-    # 等待音频播放结束
-    while pygame.mixer.music.get_busy():
-        pygame.time.Clock().tick(10)
+    # 关闭音频流
+    stream.stop_stream()
+    stream.close()
+    p.terminate()
 
-    pygame.mixer.music.unload()  # 确保文件被释放
+    # 关闭客户端会话
+    await communicate.session.close()
 
 
 def main():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    while True:
+        # 1. 录制音频
+        record_audio()
 
-    try:
-        while True:
-            # 1. 录制音频
-            record_audio()
+        # 2. 转录音频文件
+        print("正在转录音频...")
+        transcribed_text = transcribe_audio(WAVE_OUTPUT_FILENAME)
+        print(f"转录文本: {transcribed_text}\n")
 
-            # 2. 转录音频文件
-            print("正在转录音频...")
-            transcribed_text = transcribe_audio(WAVE_OUTPUT_FILENAME)
-            print(f"转录文本: {transcribed_text}\n")
+        # 3. 基于转录文本生成对话
+        print("生成对话内容...")
+        completion_text = stream_chat_completion(transcribed_text)
 
-            # 3. 基于转录文本生成对话
-            print("生成对话内容...")
-            completion_text = stream_chat_completion(transcribed_text)
+        # 4. 使用 edge-tts 直接流式播放生成的语音
+        print("\n播放生成的语音...")
+        asyncio.run(text_to_speech_and_play(completion_text))
 
-            # 4. 使用 edge-tts 将对话内容转换为语音并保存
-            output_audio_file = "output_audio.mp3"
-            print("\n生成语音文件...")
-            loop.run_until_complete(text_to_speech(completion_text, output_audio_file))
-
-            # 5. 播放生成的语音
-            print("\n播放生成的语音...")
-            play_audio(output_audio_file)
-
-            # 询问用户是否要继续对话
-            cont = input("\n是否继续对话？(y/n): ")
-            if cont.lower() != "y":
-                break
-    finally:
-        loop.close()
-        asyncio.set_event_loop(None)
+        # 询问用户是否要继续对话
+        cont = input("\n是否继续对话？(y/n): ")
+        if cont.lower() != "y":
+            break
 
 
 if __name__ == "__main__":
