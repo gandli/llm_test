@@ -34,6 +34,7 @@ def describe_and_translate_image(image_path):
 
     # 调用 Cloudflare Workers AI 生成图像描述
     description_model = "@cf/unum/uform-gen2-qwen-500m"
+    # description_model = "@cf/llava-hf/llava-1.5-7b-hf"
     description_response = run(
         description_model,
         {
@@ -75,7 +76,7 @@ def main():
 
     # 遍历 images 目录下的所有 .jpg 和 .png 文件
     for file_name in os.listdir(images_dir):
-        if file_name.lower().endswith(('.jpg', '.png')):
+        if file_name.lower().endswith((".jpg", ".png")):
             # 获取完整的文件路径
             file_path = os.path.join(images_dir, file_name)
             describe_and_translate_image(file_path)
