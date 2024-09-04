@@ -71,7 +71,7 @@ def stream_chat_completion(prompt):
         conversation_history.append(
             {
                 "role": "system",
-                "content": "你是一个语音助手，请用简体中文回答问题。请确保回答简洁、自然，并且只使用纯文本，不使用任何格式化符号或Markdown语法。回答内容应适合合成语音。",
+                "content": "You are a friendly AI voice assistant. During phone conversations, your responses should be concise, to the point, and always in Simplified Chinese. Ensure your answers are natural and fluent, using plain text only, avoiding any formatting symbols or Markdown syntax, and the content should be suitable for speech synthesis.",
             }
         )
     conversation_history.append({"role": "user", "content": prompt})
