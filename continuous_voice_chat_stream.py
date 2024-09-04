@@ -78,7 +78,12 @@ def transcribe_audio(filename):
 def stream_chat_completion(prompt):
     global conversation_history
     if not conversation_history:
-        conversation_history.append({"role": "system", "content": "你是一个语音助手。"})
+        conversation_history.append(
+            {
+                "role": "system",
+                "content": "You are a friendly AI voice assistant. During phone conversations, your responses should be concise, to the point, and always in Simplified Chinese.",
+            }
+        )
     conversation_history.append({"role": "user", "content": prompt})
 
     completion_text = ""
